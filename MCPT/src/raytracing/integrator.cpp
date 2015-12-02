@@ -592,7 +592,7 @@ glm::vec3 AllLightingIntegrator::BiDirIndirectEnergy(const Intersection &isx_cam
     {
         //if grow path fails...?
         std::cout<<"grow failed \n";
-        return forward.last.energy_accum;
+        return forward.last().energy_accum;
     }
     //for all permutations of the forward and backward paths
     for(int i = 0; i < forward.count(); i++)

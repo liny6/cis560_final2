@@ -36,7 +36,9 @@ SOURCES += \
     $$PWD/scene/materials/bxdfs/blinn_phongbxdf.cpp \
     $$PWD/scene/materials/weightedmaterial.cpp \
     $$PWD/scene/materials/bxdfs/blinnmicrofacetbxdf.cpp \
-    $$PWD/scene/materials/bxdfs/specularreflectionbxdf.cpp
+    $$PWD/scene/materials/bxdfs/specularreflectionbxdf.cpp \
+    $$PWD/scene/materials/bxdfs/fresnelbxdf.cpp \
+    $$PWD/raytracing/photonmap.cpp
 
 HEADERS += \
     $$PWD/mainwindow.h \
@@ -78,4 +80,6 @@ HEADERS += \
     $$PWD/scene/materials/bxdfs/blinn_phongbxdf.h \
     $$PWD/scene/materials/weightedmaterial.h \
     $$PWD/scene/materials/bxdfs/blinnmicrofacetbxdf.h \
-    $$PWD/scene/materials/bxdfs/specularreflectionbxdf.h
+    $$PWD/scene/materials/bxdfs/specularreflectionbxdf.h \
+    $$PWD/scene/materials/bxdfs/fresnelbxdf.h \
+    $$PWD/raytracing/photonmap.h

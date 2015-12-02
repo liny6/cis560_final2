@@ -13,6 +13,7 @@
 #include <scene/materials/bxdfs/specularreflectionbxdf.h>
 #include <scene/materials/bxdfs/blinnmicrofacetbxdf.h>
 #include <scene/materials/weightedmaterial.h>
+#include <scene/materials/bxdfs/fresnelbxdf.h>
 #include <QImage>
 
 void XMLReader::LoadSceneFromFile(QFile &file, const QStringRef &local_path, Scene &scene, Integrator &integrator)
@@ -497,6 +498,31 @@ BxDF* XMLReader::LoadBxDF(QXmlStreamReader &xml_reader)
         {
             ((BlinnMicrofacetBxDF*)result)->exponent = exponent.toFloat();
         }
+    }
+    else if(QStringRef::compare(type, QString("fresnal_refract")) == 0)
+    {
+        glm::vec3 refl_color(0.5f);
+        QStringRef color = attribs.value(QString(),QString("reflectionColor"));
+        if(QStringRef::compare(color, QString("")) != 0)
+        {
+            refl_color = ToVec3(color);
+        }
+        result = new FresnalBxDF(refl_color);
+        QStringRef exponent = attribs.value(QString(), QString("exponent"));
+        if(QStringRef::compare(exponent, QString("")) != 0)
+        {
+            ((FresnalBxDF*)result)->exponent = exponent.toFloat();
+        }
+        QStringRef iorIn = attribs.value(QString(), QString("iorIn"));
+        QStringRef iorOut = attribs.value(QString(), QString("iorOut"));
+        if((QStringRef::compare(iorIn, QString("")) !=0) && (QStringRef::compare(iorOut, QString("")) !=0))
+        {
+
+            ((FresnalBxDF*)result)->refract_idx_in = iorIn.toFloat();
+            qDebug() <<" Index of Refract In is :"<< iorIn.toFloat();
+            ((FresnalBxDF*)result)->refract_idx_out = iorOut.toFloat();
+        }
+
     }
     else
     {

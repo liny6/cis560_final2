@@ -190,8 +190,10 @@ void MyGL::SceneLoadDialog()
     integrator.scene = &scene;
     integrator.intersection_engine = &intersection_engine;
     intersection_engine.scene = &scene;
+    // create Photon Map
     ResizeToSceneCamera();
     update();
+
 }
 
 void MyGL::RaytraceScene()
