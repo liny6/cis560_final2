@@ -6,6 +6,7 @@
 #include <src/raytracing/integrator.h>
 #include <random>
 #define  PHOTONAREA  100
+#define PHOTONPERNODE 5
 //Photon//
 typedef struct __attribute__((__packed__))
 {
@@ -24,7 +25,7 @@ public:
     PhotonNode();
     PhotonNode* leftChild;
     PhotonNode* rightChild;
-    Photon photo_area[PHOTONAREA];
+    Photon photo_area[PHOTONPERNODE];
 //    QString name;
 
 private:
@@ -38,7 +39,9 @@ public:
     PhotonNode* createCausticPhotonMap();
     PhotonNode* createIndirectPhotonMap(); // need to allocate a butt load of memory
     // ~~~Gathering level~~~~~//
-    void gatherIndirectPhotons(QList<Photon*> indirect_photon_list);
+    void gatherIndirectPhotons(QList<Photon> indirect_photon_list);
+    QList<Photon> shootIndirectPhotons();
+
     //~~~~~Photon Level~~~~//
     bool isCaustic(const Geometry* scene_obj);
     void placeIndirectPhoton(const Intersection &light_isx, QList<Photon> &photon_list);

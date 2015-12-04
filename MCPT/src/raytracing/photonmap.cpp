@@ -9,6 +9,25 @@ float MIS(float f_PDF, float g_PDF)
      return glm::pow((1.0f*f_PDF), 2.0f)/(glm::pow(1.0f*f_PDF, 2.0f) + glm::pow(1.0f*g_PDF, 2.0f));
  }
 
+//~~~~~~~~Sorting  Functions ~~~~~~~~~~~//
+bool zLessThan(const Photon &P1, const Photon &P2)
+{
+    return  P1.pos.z < P2.pos.z;
+
+}
+
+bool yLessThan (const Photon &P1, const Photon &P2)
+{
+
+  return  P1.pos.y < P2.pos.y;
+}
+
+bool xLessThan(const Photon &P1, const Photon &P2)
+{
+      return  P1.pos.x < P2.pos.x;
+
+}
+
 PhotonNode::PhotonNode()
 {
    this->leftChild = NULL;
@@ -41,12 +60,27 @@ PhotonNode* PhotonMap::createIndirectPhotonMap(PhotonNode* root,QList<Photon*> &
     return NULL;
 }
 //~~~~~~Gathering Photons~~~~~~~//
-void PhotonMap::gatherIndirectPhotons(QList<Photons> &indirect_photon_list)
+PhotonNode* PhotonMap::gatherIndirectPhotons(QList<Photon> &indirect_photon_list, unsigned char XYZ) // return a node
 {
+    // find distance between nodes and have list sorted by distance from first item in list
+    PhotonNode* node = new PhotonNode();
+    for(int i = 0; i < PHOTONPERNODE; i++)
+    {
+        node->photo_area[i] =
+    }
+
+}
+
+QList<Photon> PhotonMap::shootIndirectPhotons()
+{
+    QList<Photon> indirect_photons;
+    Intersection light_isx;
     for (int i = 0; i < max_photons; i++)
     {
-
+        light_isx = RandomSampleLight();
+        placeIndirectPhoton(light_isx, indirect_photons);
     }
+    return indirect_photons;
 
 }
 //~~~~~~Photon Level~~~~~~~~~~//
