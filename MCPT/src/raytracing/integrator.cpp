@@ -844,6 +844,7 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
 {
     int depth = 0;
     Intersection isx_object1;//
+    Intersection isx_object2;
     Intersection isx_light; //sampled intersection on "light source"
     glm::vec3 color_temp(0.0f, 0.0f, 0.0f);
     glm::vec3 wi_temp(0.0f, 0.0f, 0.0f);
@@ -904,6 +905,14 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
         //let's stick to brdf sampling for determining wos, since light sampling will likely be occluded
         //note that the wi and wo are reversed since i am doing things backwards, however, it's okay since brdf is the same when i swap the two directions
         brdf_energy_temp = M_temp->SampleAndEvaluateScatteredEnergy(isx_object1, wi_temp, wo_temp, pdf_temp_brdf, rand1, rand2);
+        //update sampler ray
+        sampler = Ray(isx_object1.point, wo_temp);
+        //find the next intersection and update accordingly
+        isx_object2 = intersection_engine->GetIntersection(sampler);
+        if(isx_object2.object_hit == NULL)
+        {
+            break;
+        }
         //find solid angle light pdf
         pdf_light_temp = isx_light.object_hit->RayPDF(isx_light, sampler);
         if(pdf_light_temp<=0)
@@ -914,12 +923,10 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
         //calculate the energy object reflects towards the wo direction
         L_temp = EstimateDirectLighting(isx_object1, n_light, n_brdf, wo_temp) + L_last;
         L_temp = ComponentMult(brdf_energy_temp, L_temp);
-        L_temp = ComponentMult(ComponentMult(color_temp, M_temp->base_color), isx_object1.texture_color);
-        L_temp = color_temp*W/pdf_temp_brdf*glm::abs(glm::dot(isx_object1.normal, wi_temp));
-        //update sampler ray
-        sampler = Ray(isx_object1.point, wo_temp);
-        //find the next intersection and update accordingly
-        isx_object1 = intersection_engine->GetIntersection(sampler);
+        color_temp = ComponentMult(M_temp->base_color, isx_object1.texture_color);
+        L_temp = ComponentMult(L_temp, color_temp)*W/pdf_temp_brdf*glm::abs(glm::dot(isx_object1.normal, wi_temp));
+
+
         M_temp = isx_object1.object_hit->material;
         //update wi
         wi_temp = -wo_temp;
@@ -931,6 +938,7 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
         backward_ret.append(path_sample);
 
         L_last = L_temp;
+        isx_object1 = isx_object2;
 
         depth++;
     }
