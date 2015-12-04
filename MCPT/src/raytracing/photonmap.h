@@ -4,8 +4,9 @@
 #include <src/la.h>
 #include <scene/scene.h>
 #include <src/raytracing/integrator.h>
-#define  PHOTONAREA  10
-
+#include <random>
+#define  PHOTONAREA  100
+//Photon//
 typedef struct __attribute__((__packed__))
 {
     glm::vec3 pos;
@@ -16,7 +17,7 @@ typedef struct __attribute__((__packed__))
     float alpha; // Power of light source / number of emitted photons
 } Photon;
 
-
+//Photon node//
 class PhotonNode
 {
 public:
@@ -24,29 +25,44 @@ public:
     PhotonNode* leftChild;
     PhotonNode* rightChild;
     Photon photo_area[PHOTONAREA];
-    QString name;
-//    Intersection GetIntersection(Ray r);
-//    Intersection isx;
+//    QString name;
+
 private:
 };
-class PhotonMap: public Integrator
+//Creating Map//
+class PhotonMap
 {
 public:
+    // MAP LEVEL//
     PhotonMap();
-    PhotonNode* createIndirectPhotonMap(); // need to allocate a butt load of memory
-    PhotonNode* createDirectPhotonMap(PhotonNode* root, QList <Geometry*> &scene_geom, QList<Photon*> &photons );
     PhotonNode* createCausticPhotonMap();
-    PhotonNode* createRadiancePhotonMap();
-    PhotonNode* createVolumePhotonMap();
-    void setMaxPhotons(int maxPhotons) {max_photons = maxPhotons; }
+    PhotonNode* createIndirectPhotonMap(); // need to allocate a butt load of memory
+    // ~~~Gathering level~~~~~//
+    void gatherIndirectPhotons(QList<Photon*> indirect_photon_list);
+    //~~~~~Photon Level~~~~//
+    bool isCaustic(const Geometry* scene_obj);
+    void placeIndirectPhoton(const Intersection &light_isx, QList<Photon> &photon_list);
+    Intersection RandomSampleLight();
+    glm::vec3 getPhotonEnergy(const Intersection & light_isx, Intersection &obj,
+                                                Ray photon_ray, glm::vec3 & wi_ret ,float & pdf_bxdf);
+
+    Photon createPhoton(const glm::vec3 point, const glm::vec3 &energy,
+                                        float alpha, const glm::vec3 direction);
+
+    // Housekeeping//
+    void setMaxPhotons(int maxPhotons) {max_photons = maxPhotons;
+                                       num_photons = (float)maxPhotons;}
     void setNumBounces(int max_bounce){num_bounces = max_bounce;}
     Scene* scene;
     IntersectionEngine* intersection_engine;
     void setLights(QList<Geometry*> L){lights =L;}
-private:
-QList<Geometry*> lights;
-int  max_photons;
-int num_bounces;
+protected:
+    QList<Geometry*> lights;
+    std::mt19937 mersenne_generator;
+    std::uniform_real_distribution<float> unif_distribution;
+    int  max_photons;
+    int num_bounces;
+    float num_photons;
 
 };
 

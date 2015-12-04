@@ -1,7 +1,13 @@
 #include "photonmap.h"
 
-
-
+glm::vec3 ComponentMult(const glm::vec3 &a, const glm::vec3 &b)
+{
+    return glm::vec3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+float MIS(float f_PDF, float g_PDF)
+ {
+     return glm::pow((1.0f*f_PDF), 2.0f)/(glm::pow(1.0f*f_PDF, 2.0f) + glm::pow(1.0f*g_PDF, 2.0f));
+ }
 
 PhotonNode::PhotonNode()
 {
@@ -10,13 +16,12 @@ PhotonNode::PhotonNode()
 //   photo_area = {0,0,0,0,0,0,0,0,0,0};
 }
 
-PhotonMap::PhotonMap():num_bounces(3),mersenne_generator(rand()), unif_distribution(0.0f,1.0f),max_photons(1000)
+PhotonMap::PhotonMap():num_bounces(3),mersenne_generator(rand()), unif_distribution(0.0f,1.0f),max_photons(10000), num_photons(10000)
 {
    scene = NULL;
    intersection_engine = NULL;
 }
-
-PhotonNode* PhotonMap::createDirectPhotonMap(PhotonNode* root, QList <Geometry*> &scene_geom, QList<Photon*> &photons )
+PhotonNode* PhotonMap::createIndirectPhotonMap(PhotonNode* root,QList<Photon*> &photon_list)
 {
     /*
      *  random Ray from light to somewhere on the scene
@@ -35,60 +40,120 @@ PhotonNode* PhotonMap::createDirectPhotonMap(PhotonNode* root, QList <Geometry*>
      }
     return NULL;
 }
-//Ray PhotonMap::createRandRay(float u1, float u2, float l1, float l2)
-//{
-
-//}
-// flip this around so geometry makes ray to light
-Intersection PhotonMap::RandomSampleLight()
+//~~~~~~Gathering Photons~~~~~~~//
+void PhotonMap::gatherIndirectPhotons(QList<Photons> &indirect_photon_list)
 {
-    int light_choice = 0;
-    float rand1 = unif_distribution(mersenne_generator);
-    float rand2 = unif_distribution(mersenne_generator);
+    for (int i = 0; i < max_photons; i++)
+    {
 
-    light_choice = rand()%scene->lights.count();
-    Geometry* light_obj = scene->lights.at(light_choice);
-    light_obj->ComputeNormal()
-//    Intersection light_isx = light_obj->GetRandISX(rand1, rand2, light_obj->)
+    }
 
-    //return isx;
 }
-
-PhotonNode PhotonMap::placePhotons(const Intersection &light_isx)
+//~~~~~~Photon Level~~~~~~~~~~//
+void PhotonMap::placeIndirectPhoton(const Intersection &light_isx, QList<Photon> &photon_list)
 {
-
-    Photon P;
-    glm::vec3 wiW;
+   // randomly choose geometry in the scene
     int geom_choice = 0;
     float rand1 = unif_distribution(mersenne_generator);
     float rand2 = unif_distribution(mersenne_generator);
     geom_choice = rand()%scene->objects.count();
     Geometry* scene_obj = scene->objects.at(geom_choice);
-    Intersection obj_isx = scene_obj->GetRandISX(rand1, rand2,light_isx.normal);
+    Ray  photon_ray = scene_obj->GetRandRay(rand1,rand2, light_isx); // direction from light source to point on scene
+   //~~~~~~~~~~~~~~~~~
+   // using ray from random geometry isx and light isx find what the light actually hits
+    Intersection obj_isx= intersection_engine->GetIntersection(photon_ray);
+    Photon P;
 
-    wiW = obj_isx.point - light_isx.point;
-    obj_isx.t = glm::length(wiW);
-    wiW = glm::normalize(wiW);
 
-    Ray  photon_ray = Ray(light_isx.point, wiW); // direction from light source to point on scene
-    QList<Intersection>obstruction_test = intersection_engine->GetAllIntersections(photon_ray);
+   //DO RUSSIAN ROULETTE NEEDS CLEAN UP 2 ZA MAYZX
+    float russian = unif_distribution(mersenne_generator);
+    int depth = 0;
+    light_isx.point = light_isx.point + 0.0001f; // avoid shadow acne
+    float pdf_light_temp;
+    float pdf_bxdf_temp;
+    glm::vec3 alpha;
+    glm::vec3 anew;
+    alpha = glm::abs(glm::dot(light_isx.normal, photon_ray.direction) *L_energy)/(pdf_bxdf_temp*pdf_light_temp);
+    float throughput;
+    float throughput2;
+   while ( depth < max_depth  )
+   {
+       // find max rgb value
+       throughput = glm::max(glm::max(alpha.r, alpha.g), alpha.b);
 
-    for (Intersection scene_isx: obstruction_test)
-    {
-        if(scene_isx.object_hit == *scene_obj)
+       glm::vec3 L_energy = getPhotonEnergy(light_isx, obj_isx, photon_ray, wi_ret, pdf_bxdf_temp);
+       pdf_light_temp = light_isx.object_hit->RayPDF(light_isx, photon_ray);
+
+       P = createPhoton(obj_isx.point, L_temp, light_isx.object_hit->material->intensity, photon_ray.direction);
+       photon_list.append(P);
+       if(pdf_light_temp <=0.0f)
+       {
+           return;
+       }
+        anew = alpha*fr* glm::abs(glm::dot(wi_ret, obj.normal))/pdf_bxdf_temp;
+        throughput2 = glm::max(glm::max(anew.r, anew.g), anew.b);
+        float continueProb = glm::min(1.0f , throughput2/throughput);
+        if( russian > continueProb)
         {
-            P = createPhoton(scene_isx.point,light_isx.object_hit->material->intensity/1000, photon_ray.direction);
-
+            return;
         }
-    }
+        alpha = anew/ continueProb;
+
+       //update sampler ray
+
+       //find the next intersection and update accordingly
+
+       wi_temp = -wo_temp;
+        photon_ray = Ray(obj.point, wo_temp);
+       obj_isx = intersection_engine->GetIntersection(photon_ray);
+
+       depth++;
+       russian = unif_distribution(mersenne_generator);
+   }
+
+}
+Intersection PhotonMap::RandomSampleLight()
+{
+    int light_choice = 0;
+    float rand1 = unif_distribution(mersenne_generator);
+    float rand2 = unif_distribution(mersenne_generator);
+    light_choice = rand()%scene->lights.count();
+    Geometry* light_obj = scene->lights.at(light_choice);
+    Intersection light_isx = light_obj->GetRandISX(rand1, rand2, glm::vec3(0));
+
+    return light_isx;
+}
+glm::vec3 PhotonMap::getPhotonEnergy(const Intersection & light_isx, Intersection &obj, Ray photon_ray, glm::vec3 & wi_ret ,float & pdf_bxdf)
+{
+    float rand3,rand4, W,pdf_light_temp;
+     rand3 = unif_distribution(mersenne_generator);
+     rand4 = unif_distribution(mersenne_generator);
+    glm::vec3 L_temp;
+    pdf_light_temp = light_isx.object_hit->RayPDF(light_isx, photon_ray);
+    glm::vec3  brdf_energy_temp =obj.object_hit->material->SampleAndEvaluateScatteredEnergy(obj ,photon_ray.direction,wi_ret,
+                                                                                 pdf_bxdf,rand3,rand4);
+    W = MIS(pdf_bxdf,pdf_light_temp);
+    L_temp = brdf_energy_temp;
+    L_temp = ComponentMult(ComponentMult(L_temp, obj.object_hit->material->base_color), obj.texture_color);
+    L_temp = L_temp*W/pdf_bxdf*glm::abs(glm::dot(obj.normal, wi_ret));
+
+   return L_temp;
 }
 Photon PhotonMap::createPhoton(const glm::vec3 point, const glm::vec3 &energy, float alpha, const glm::vec3 direction)
 {
     Photon P;
-    P.alpha = alpha;
+    P.alpha = alpha/ num_photons;
     P.pos = point;
     P.energy = energy;
     P.dir = direction;
     return P;
+}
+bool PhotonMap::isCaustic(const Geometry* scene_obj)
+{
+    if (scene_obj->material->bxdfs.first()->name == "lambert1")
+    {
+            return false;
+    }
+            return true;
 }
 
