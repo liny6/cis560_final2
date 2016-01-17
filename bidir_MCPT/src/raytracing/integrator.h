@@ -67,5 +67,6 @@ public:
     void grow_path(const Intersection &isx_camera_start, QList<Path> &forward_ret, QList<Path> &backward_ret, const glm::vec3 &woW, int half_max_depth, int splits);
     void grow_Bxdf_sampling(const Intersection &isx_camera_start, QList<Path> &forward_ret, const glm::vec3 &woW, int half_max_depth, int splits);
     void grow_light_sampling(const Intersection &isx_camera_start, QList<Path> &forward_ret, const glm::vec3 &woW, int half_max_depth, int splits);
-    void grow_from_light_source(QList<Path> &backward_ret, int half_max_depth);
+    void grow_from_light_source_bxdf(QList<Path> &backward_ret, int half_max_depth);
+    void grow_from_light_source_light(QList<Path> &backward_ret, int half_max_depth);
 };

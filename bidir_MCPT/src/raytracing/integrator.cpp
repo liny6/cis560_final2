@@ -336,7 +336,7 @@ glm::vec3 AllLightingIntegrator::TraceRay(Ray r, unsigned int depth)
     glm::vec3 Indirect_Lighting(0,0,0);// stores the color value of reflected light from the point hit
     unsigned int n_light = 10; //number of light samples
     unsigned int n_brdf = 10; //number of brdf samples
-    unsigned int n_indirect = 10; //number of sample splits
+    unsigned int n_indirect = 25; //number of sample splits
 
     //for BRDF PDF sampling
     //
@@ -365,6 +365,7 @@ glm::vec3 AllLightingIntegrator::TraceRay(Ray r, unsigned int depth)
     {
         Direct_Lighting = EstimateDirectLighting(isx, n_light, n_brdf, -r.direction);
         Indirect_Lighting = BiDirIndirectEnergy(isx, n_indirect, -r.direction);
+        //Indirect_Lighting = EstimateIndirectLighting(isx, n_indirect, -r.direction);
     }
     //---------------------//
 
@@ -584,7 +585,10 @@ glm::vec3 AllLightingIntegrator::BiDirIndirectEnergy(const Intersection &isx_cam
         return forward.last().energy_accum;
     }
     */
-
+    if(forward.count() == 0)
+    {
+        return color_final;
+    }
 
 
     total_paths  = static_cast<float>(forward.count()*backward.count());
@@ -660,7 +664,8 @@ void AllLightingIntegrator::grow_path(const Intersection &isx_camera_start, QLis
     {
         grow_Bxdf_sampling(isx_camera_start, forward_ret, woW, half_max_depth, splits);
         grow_light_sampling(isx_camera_start, forward_ret, woW, half_max_depth, splits);
-        grow_from_light_source(backward_ret, half_max_depth);
+        grow_from_light_source_bxdf(backward_ret, half_max_depth);
+        grow_from_light_source_light(backward_ret, half_max_depth);
     }
     return;
 }
@@ -710,7 +715,34 @@ void AllLightingIntegrator::grow_Bxdf_sampling(const Intersection &isx_camera_st
         isx_light = intersection_engine->GetIntersection(sampler);
         //this ray dies if I hit a real light source or nothing
         if(isx_light.object_hit == NULL) break;
-        else if(isx_light.object_hit->material->is_light_source) break;
+        else if(isx_light.object_hit->material->is_light_source)
+        {
+            /*
+            //here i have to do an extra check for caustics
+            if(!isx_temp.object_hit->material->name.compare(QString("refractive_specular")))
+            {
+                L_temp = isx_light.object_hit->material->intensity*isx_light.object_hit->material->base_color;
+                pdf_light_temp = isx_light.object_hit->RayPDF(isx_light, sampler);
+                if(pdf_light_temp <= 0) break;
+
+                W = MIS(pdf_temp_brdf, pdf_light_temp);
+
+                color_temp = ComponentMult(brdf_energy_accum, L_temp);
+                color_temp = ComponentMult(ComponentMult(color_temp, M_temp->base_color), isx_temp.texture_color);
+                color_temp = color_temp*W/pdf_temp_brdf*glm::abs(glm::dot(isx_temp.normal, wi_temp));
+                color_accum = color_accum + color_temp;
+                path_sample.energy_accum = color_accum;
+
+                forward_ret.append(path_sample);
+                break;
+            }
+            else
+            {
+                break;
+            }
+            */
+            break;
+        }
 
         //to avoid shadow acne
         isx_light.point = isx_light.point + epsilon*isx_light.normal;
@@ -780,7 +812,61 @@ void AllLightingIntegrator::grow_light_sampling(const Intersection &isx_camera_s
         light_source_choice = rand()%scene->objects.count();
         obj_temp = scene->objects[light_source_choice];
         //if I hit a real light source, kill the ray
-        if (scene->objects[light_source_choice]->material->is_light_source) break;
+        if (scene->objects[light_source_choice]->material->is_light_source)
+        {
+            /*
+            //here i have to do an extra check for caustics
+            if(!isx_temp.object_hit->material->name.compare(QString("refractive_specular")))
+            {
+                isx_light = obj_temp->GetRandISX(rand1, rand2, isx_temp.normal);
+                //update random numbers
+                rand1 = unif_distribution(mersenne_generator);
+                rand2 = unif_distribution(mersenne_generator);
+                //make ray towards these points
+                wi_temp = glm::normalize(isx_light.point - isx_temp.point);
+                sampler = Ray(isx_temp.point, wi_temp);
+
+                //update accumulated brdf energy
+                brdf_energy_temp = M_temp->EvaluateScatteredEnergy(isx_temp, wo_temp, wi_temp, pdf_temp_brdf);
+                brdf_energy_accum = ComponentMult(brdf_energy_accum, brdf_energy_temp);
+                //if brdf pdf doesn't work, kill the ray
+                if(pdf_temp_brdf <= 0) break;
+
+
+                //update my light intersection
+                isx_light = intersection_engine->GetIntersection(sampler);
+
+                //this ray dies if it hit nothing or is blocked
+                if(isx_light.object_hit == NULL) break;
+                if(isx_light.object_hit != obj_temp) break;
+
+                L_temp = isx_light.object_hit->material->intensity*isx_light.object_hit->material->base_color;
+                pdf_light_temp = isx_light.object_hit->RayPDF(isx_light, sampler);
+                if(pdf_light_temp <= 0) break;
+
+
+                W = MIS(pdf_temp_brdf, pdf_light_temp);
+
+                color_temp = ComponentMult(brdf_energy_accum, L_temp);
+                color_temp = ComponentMult(ComponentMult(color_temp, M_temp->base_color), isx_temp.texture_color);
+                color_temp = color_temp*W/pdf_temp_brdf*glm::abs(glm::dot(isx_temp.normal, wi_temp));
+                color_accum = color_accum + color_temp;
+
+                path_sample.dir = wo_temp;
+                path_sample.isx = isx_temp;
+                path_sample.energy_accum = color_accum;
+
+                forward_ret.append(path_sample);
+                break;
+            }
+            else
+            {
+                break;
+            }
+            //break;
+            */
+            break;
+        }
 
         isx_light = obj_temp->GetRandISX(rand1, rand2, isx_temp.normal);
         //update random numbers
@@ -800,7 +886,7 @@ void AllLightingIntegrator::grow_light_sampling(const Intersection &isx_camera_s
         isx_light.point = isx_light.point + epsilon*isx_light.normal;
 
         //find out the pdf w/r/t light
-        pdf_light_temp = obj_temp->RayPDF(isx_light, sampler);
+        pdf_light_temp = isx_light.object_hit->RayPDF(isx_light, sampler);
         //if my pdf is negative, kill the ray as well
         if(pdf_light_temp <= 0) break;
 
@@ -840,7 +926,7 @@ void AllLightingIntegrator::grow_light_sampling(const Intersection &isx_camera_s
     return;
 }
 
-void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, int half_max_depth)
+void AllLightingIntegrator::grow_from_light_source_bxdf(QList<Path> &backward_ret, int half_max_depth)
 {
     int depth = 0;
     Intersection isx_object1;//
@@ -864,6 +950,7 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
     float epsilon = 0.0001;
 
     int light_source_choice;
+    int object_choice;
     unsigned int n_light = 10;
     unsigned int n_brdf = 10;
 
@@ -877,13 +964,23 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
     rand1 = unif_distribution(mersenne_generator);
     rand2 = unif_distribution(mersenne_generator);
     //sample some other object in the scene
-    //randomlly shoot out rays from the light source from a hemisphere, this will be naive monte carlo sampling so don't bother with the pdf
-    sampler = isx_light.object_hit->GetRandRay(rand1, rand2, isx_light);
+    object_choice = rand()%scene->objects.count();
+    isx_object1 = scene->objects[object_choice]->GetRandISX(rand1, rand2, glm::vec3(0));
+    if(isx_object1.object_hit->material->is_light_source) return;
+
+    sampler = Ray(isx_light.point, (isx_object1.point - isx_light.point));
     isx_object1 = intersection_engine->GetIntersection(sampler);
+
     if(isx_object1.object_hit == NULL) return;
     if(isx_object1.object_hit->material->is_light_source) return;
 
+    //this is essentially light source sampling in reverse, but i don't worry about pdf because
+    //it will be handled in direct lighting later
+
     M_temp = isx_object1.object_hit->material;
+    pdf_light_temp = isx_object1.object_hit->RayPDF(isx_object1, sampler);
+    if(pdf_light_temp <= 0) return;
+    L_temp = (isx_light.object_hit->material->intensity * isx_light.object_hit->material->base_color)/pdf_light_temp;
 
     //set up wi
     sampler.direction = -sampler.direction;
@@ -894,6 +991,8 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
     path_sample.energy_accum = L_temp;
     path_sample.dir = wi_temp;
     backward_ret.append(path_sample);
+
+    L_last = L_temp;
 
 
     while(depth < half_max_depth)
@@ -913,8 +1012,12 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
         {
             break;
         }
+        if(isx_object2.object_hit->material->is_light_source)
+        {
+            break;
+        }
         //find solid angle light pdf
-        pdf_light_temp = isx_light.object_hit->RayPDF(isx_light, sampler);
+        pdf_light_temp = isx_object1.object_hit->RayPDF(isx_object2, sampler);
         if(pdf_light_temp<=0)
         {
             break;
@@ -927,7 +1030,145 @@ void AllLightingIntegrator::grow_from_light_source(QList<Path> &backward_ret, in
         L_temp = ComponentMult(L_temp, color_temp)*W/pdf_temp_brdf*glm::abs(glm::dot(isx_object1.normal, wi_temp));
 
 
-        M_temp = isx_object1.object_hit->material;
+        M_temp = isx_object2.object_hit->material;
+        //update wi
+        wi_temp = -wo_temp;
+
+        //update path and append to the list
+        path_sample.isx = isx_object1;
+        path_sample.energy_accum = L_temp;
+        path_sample.dir = wi_temp;
+        backward_ret.append(path_sample);
+
+        L_last = L_temp;
+        isx_object1 = isx_object2;
+
+        depth++;
+    }
+    return;
+}
+
+void AllLightingIntegrator::grow_from_light_source_light(QList<Path> &backward_ret, int half_max_depth)
+{
+    int depth = 0;
+    Intersection isx_object1;//
+    Intersection isx_object2;
+    Intersection isx_light; //sampled intersection on "light source"
+    glm::vec3 color_temp(0.0f, 0.0f, 0.0f);
+    glm::vec3 wi_temp(0.0f, 0.0f, 0.0f);
+    glm::vec3 wo_temp(0.0f, 0.0f, 0.0f);
+    glm::vec3 brdf_energy_temp(0.0f, 0.0f, 0.0f);
+    glm::vec3 L_temp(0.0f, 0.0f, 0.0f);
+    glm::vec3 L_last(0.0f, 0.0f, 0.0f);
+    Material* M_temp;
+    Ray sampler;
+    Path path_sample;
+    float pdf_temp_brdf(0);
+    float pdf_light_temp(0);
+    float W(0); //for MIS
+
+    float rand1 = unif_distribution(mersenne_generator);
+    float rand2 = unif_distribution(mersenne_generator);
+    float epsilon = 0.0001;
+
+    int light_source_choice;
+    int object_choice;
+    unsigned int n_light = 10;
+    unsigned int n_brdf = 10;
+
+
+    //sample a random point on one of the light source
+    light_source_choice = rand()%scene->lights.count();
+    isx_light = scene->lights[light_source_choice]->GetRandISX(rand1, rand2, glm::vec3(0));
+    //to avoid self intersection due to floating point error
+    isx_light.point = isx_light.point + epsilon*isx_light.normal;
+    //renew random numbers
+    rand1 = unif_distribution(mersenne_generator);
+    rand2 = unif_distribution(mersenne_generator);
+    //sample some other object in the scene
+    object_choice = rand()%scene->objects.count();
+    isx_object1 = scene->objects[object_choice]->GetRandISX(rand1, rand2, glm::vec3(0));
+    if(isx_object1.object_hit->material->is_light_source) return;
+
+    sampler = Ray(isx_light.point, (isx_object1.point - isx_light.point));
+    isx_object1 = intersection_engine->GetIntersection(sampler);
+
+    if(isx_object1.object_hit == NULL) return;
+    if(isx_object1.object_hit->material->is_light_source) return;
+
+    //this is essentially light source sampling in reverse, but i don't worry about pdf because
+    //it will be handled in direct lighting later
+
+    M_temp = isx_object1.object_hit->material;
+    pdf_light_temp = isx_object1.object_hit->RayPDF(isx_object1, sampler);
+    if(pdf_light_temp <= 0) return;
+    L_temp = (isx_light.object_hit->material->intensity * isx_light.object_hit->material->base_color)/pdf_light_temp;
+
+    //set up wi
+    sampler.direction = -sampler.direction;
+    wi_temp = sampler.direction;
+
+    //update path and append to the list
+    path_sample.isx = isx_object1;
+    path_sample.energy_accum = L_temp;
+    path_sample.dir = wi_temp;
+    backward_ret.append(path_sample);
+
+    L_last = L_temp;
+
+    while(depth < half_max_depth)
+    {
+        //renew random numbers
+        rand1 = unif_distribution(mersenne_generator);
+        rand2 = unif_distribution(mersenne_generator);
+        //now the first intersection is set up, we can start traversing and caculate the energy a point receives from some direction
+        //let's stick to brdf sampling for determining wos, since light sampling will likely be occluded
+        //note that the wi and wo are reversed since i am doing things backwards, however, it's okay since brdf is the same when i swap the two directions
+        object_choice = rand()%scene->objects.count();
+        isx_object2 = scene->objects[object_choice]->GetRandISX(rand1, rand2, glm::vec3(0));
+        if(isx_object2.object_hit->material->is_light_source)
+        {
+            break;
+        }
+        //update sampler ray
+        sampler = Ray(isx_object1.point, isx_object2.point - isx_object1.point);
+        //find the next intersection and update accordingly
+        isx_object2 = intersection_engine->GetIntersection(sampler);
+
+        if(isx_object2.object_hit == NULL)
+        {
+            break;
+        }
+        if(isx_object2.object_hit->material->is_light_source)
+        {
+            break;
+        }
+
+        wo_temp = sampler.direction;
+
+        //find solid angle light pdf
+        pdf_light_temp = isx_object2.object_hit->RayPDF(isx_object2, sampler);
+        //calculate brdf
+        brdf_energy_temp = M_temp->EvaluateScatteredEnergy(isx_object1, wo_temp, wi_temp, pdf_temp_brdf);
+
+        if(pdf_light_temp<=0)
+        {
+            break;
+        }
+        if(pdf_temp_brdf<=0)
+        {
+            break;
+        }
+
+        W = MIS(pdf_light_temp, pdf_temp_brdf);
+
+        //calculate the energy object reflects towards the wo direction
+        L_temp = EstimateDirectLighting(isx_object1, n_light, n_brdf, wo_temp) + L_last;
+        L_temp = ComponentMult(brdf_energy_temp, L_temp);
+        color_temp = ComponentMult(M_temp->base_color, isx_object1.texture_color);
+        L_temp = ComponentMult(L_temp, color_temp)*W/pdf_temp_brdf*glm::abs(glm::dot(isx_object1.normal, wi_temp));
+
+        M_temp = isx_object2.object_hit->material;
         //update wi
         wi_temp = -wo_temp;
 

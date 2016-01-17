@@ -1,3 +1,4 @@
+/*
 #include "photonmap.h"
 
 glm::vec3 ComponentMult(const glm::vec3 &a, const glm::vec3 &b)
@@ -51,7 +52,7 @@ PhotonNode* PhotonMap::createIndirectPhotonMap(PhotonNode* root,QList<Photon*> &
      * These are K-d Tree
      * Can store photon multiple times
      * Photons with a surface are computed with BRDF/ BTDF/ Absorbed (decided with russian roulette)
-     */
+
     for (Geometry* Lite: lights)
 
     {
@@ -191,3 +192,4 @@ bool PhotonMap::isCaustic(const Geometry* scene_obj)
             return true;
 }
 
+*/
